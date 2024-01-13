@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: initscript
+  namespace: mailserver
+data:
+  createCFs.sh: |
+    #/bin/bash
+    noline=$(env | grep CFNAME | wc -l) #count the lines that the result provides
+    for i in `seq 1 $noline`
+    do
+      cat << EOF | tee /pre-install/postfix/$(printenv CFNAME$i).cf
+    user = $(printenv POSTFIX_USER | base64 -d)
+    password = $(printenv POSTFIX_PASS | base64 -d)
+    hosts = $(printenv SERVER)
+    dbname = $(printenv DBNAME)
+    #port = $(printenv PORT)
+    query = $(printenv QUERY$i)
+    EOF
+    done
