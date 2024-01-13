@@ -1,0 +1,6 @@
+#!/bin/sh
+
+`source postmap.sh`
+chown -R root:postfix /etc/postfix
+postfix set-permissions
+exec /sbin/runsvdir /etc/service
