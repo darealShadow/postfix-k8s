@@ -1,2 +1,2 @@
 # postfix-k8s
-This repo contains the documentation for my postfix implementation in Kubernetes
+This repo contains the documentation for my postfix implementation in Kubernetes and aligns with videos I made available on my youtube channel https://www.youtube.com/@Iloveopensourcesoftware.
