@@ -1,0 +1,22 @@
+#/bin/sh
+ctr=$(buildah from alpine:latest)
+buildah run $ctr apk --no-cache update
+buildah run $ctr apk --no-cache upgrade
+buildah run $ctr apk add --no-cache bash ca-certificates libsasl mailx postfix rsyslog runit postfix-policyd-spf-perl postfix-mysql mariadb-client mariadb-common
+buildah copy $ctr service /etc/svc/
+buildah run $ctr mkdir /etc/service/postfix
+buildah run $ctr mkdir /etc/service/rsyslog
+buildah run $ctr ln -s /etc/svc/rsyslog/run /etc/service/rsyslog/run
+buildah run $ctr ln -s /etc/svc/postfix/run /etc/service/postfix/run
+buildah copy $ctr usr/sbin/runit_bootstrap /usr/sbin/runit_bootstrap
+buildah copy $ctr usr/sbin/postmap.sh /usr/sbin/postmap.sh
+buildah copy $ctr etc/rsyslog.conf /etc/rsyslog.conf
+buildah config --stop-signal SIGKILL $ctr
+buildah config --entrypoint "/usr/sbin/runit_bootstrap" $ctr
+echo "building group"
+buildah run $ctr addgroup -g 5000 vmail
+echo "adding user to group"
+buildah run $ctr addgroup vmail vmail
+buildah config --author "Manuel" --label name='postfix based on alpine for k8s application' $ctr
+buildah config --label source='https://www.tauceti.blog/posts/run-postfix-in-kubernetes/#spf-sender-policy-framework' $ctr
+img=$(buildah commit $ctr postfix:0.3)
