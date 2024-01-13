@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: tls-secret
+  namespace: mailserver
+  annotations:
+    replicator.v1.mittwald.de/replicate-from: nextcloud/nextcloud-cert-tls
+type: kubernetes.io/tls
+data:
+  tls.key: ""
+  tls.crt: ""
