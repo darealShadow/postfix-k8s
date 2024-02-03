@@ -1,0 +1,18 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: smtp
+  namespace: mailserver
+spec:
+  selector:
+    app: postfix
+    role: mailmanager
+  ports:
+  - name: smtp-unenc
+    port: 25
+    protocol: TCP
+    targetPort: 25
+  - name: smtp-enc
+    port: 587
+    protocol: TCP
+    targetPort: 587
