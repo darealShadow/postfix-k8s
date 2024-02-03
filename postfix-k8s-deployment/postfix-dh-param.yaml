@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dhparam
+  namespace: mailserver
+type: Opaque
+data:
+  dh512.pem: <ADD YOUR DH512 KEY HERE>
+  dh2048.pem: <ADD YOUR DH2048 KEY HERE>
