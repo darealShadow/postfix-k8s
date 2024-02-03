@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cf-configs
+  namespace: mailserver
+data:
+  SERVER: "mariadb-galera-cluster.database.svc.cluster.local"
+  PORT: "3306"
+  DBNAME: "<YOUR DATABASE NAME HERE>"
+  CFNAME1: "virtual_mailbox"
+  QUERY1: "select ISP_mail from user_map where local_mail='%s' AND active=1;"
+  CFNAME2: "aliases"
+  QUERY2: "select recipient from aliases where alias='%s' AND active=1;"
+  CFNAME3: "sender_dependent_relayhost_maps"
+  QUERY3: "select ifnull(min(relay),'<ADD YOUR MAIL RELAY AND PORT HERE IN THE FORMAT MAILRELAY:PORT>') relay from user_map where ISP_mail='%s' and active=1;"
+  CFNAME4: "smtp_sasl_password_maps"
+  QUERY4: "SELECT IF((select count(relay) from user_map where ISP_mail='%s' and active=1) < 1,(select concat('<LOGIN USER FOR GENERIC MAIL RELAY>:',aes_decrypt(password,'<DECRYPTION PASSWORD FOR THE DATABASE>')) from user_map where ISP_mail='default' and active=1),(Select concat(ISP_mail,':',aes_decrypt(password,'<DECRYPTION PASSWORD FOR THE DATABASE>')) from user_map where ISP_mail='%s' and active=1));"
+  CFNAME5: "virtual_alias_map"
+  QUERY5: "SELECT internal_rcpt FROM virtual_aliases WHERE intended_rcpt='%s' AND active=1;"
+  #CFNAME6: "virtual_mailbox_maps"
+  #QUERY6: "SELECT storage from virtual_mailbox_map WHERE user='%s' AND active=1;"
+  #CFNAME7: "recipient_canonical_maps"
+  #QUERY7: "SELECT internal_rcpt FROM recipient_canonical_maps WHERE recipient='%s';"
+  #CFNAME8: "smtpd_sender_login_maps"
+  #QUERY8: "SELECT username as user FROM smtpd_sender_login_maps WHERE envelope='%s' AND active=1;"
