@@ -1,0 +1,189 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: postfix
+  namespace: mailserver
+  labels:
+    app: postfix
+spec:
+  selector:
+    matchLabels:
+      app: postfix
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        app: postfix
+    spec:
+      serviceAccountName: postfix
+#      terminationGracePeriodSeconds: 30
+#      hostNetwork: true
+#      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+      - image: quay.io/realshadow/postfix:latest
+        name: postfix
+        imagePullPolicy: Always
+        ports:
+        - name: smtp-unenc
+          containerPort: 25
+          #hostPort: 25
+          protocol: TCP
+        - name: smtp-enc
+          containerPort: 587
+          protocol: TCP
+          #hostPort: 587
+        #securityContext:
+        #  capabilities:
+        #    drop:
+        #    - ALL
+        #    add:
+        #    - DAC_OVERRIDE
+        #    - FOWNER
+        #    - SETUID
+        #    - SETGID
+        #    - NET_BIND_SERVICE
+        volumeMounts:
+        - name: pre-install
+          mountPath: /etc/postfix/main.cf
+          subPath: postfix/main.cf
+          #readOnly: true
+        - name: pre-install
+          mountPath: /etc/postfix/virtual_mailbox.cf
+          subPath: postfix/virtual_mailbox.cf
+        - name: pre-install
+          mountPath: /etc/postfix/aliases.cf
+          subPath: postfix/aliases.cf
+        - name: pre-install
+          mountPath: /etc/postfix/sender_dependent_relayhost_maps.cf
+          subPath: postfix/sender_dependent_relayhost_maps.cf
+        - name: pre-install
+          mountPath: /etc/postfix/smtp_sasl_password_maps.cf
+          subPath: postfix/smtp_sasl_password_maps.cf
+        - name: pre-install
+          mountPath: /etc/postfix/virtual_alias_map.cf
+          subPath: postfix/virtual_alias_map.cf
+        - name: pre-install
+          mountPath: /pre-install
+        - name: var-mail
+          mountPath: /var/mail
+        - name: var-mail-state
+          mountPath: /var/mail-state
+        - name: var-spool-postfix
+          mountPath: /var/spool/postfix
+        #- name: pre-install
+        #  mountPath: /etc/postfix/virtual_mailbox_maps.cf
+        #  subPath: postfix/virtual_mailbox_maps.cf
+        #- name: pre-install
+        #  mountPath: /etc/postfix/recipient_canonical_maps.cf
+        #  subPath: postfix/recipient_canonical_maps.cf
+        #- name: pre-install
+        #  mountPath: /etc/postfix/smtpd_sender_login_maps.cf
+        #  subPath: postfix/smtpd_sender_login_maps.cf
+        - name: certs
+          subPath: tls.crt
+          mountPath: /etc/ssl/certs/tls.crt
+          readOnly: true
+        - name: certs
+          subPath: tls.key
+          mountPath: /etc/ssl/private/tls.key
+          readOnly: true
+        - name: dhparam
+          subPath: dh512.pem
+          mountPath: /etc/postfix/dh512.pem
+          readOnly: true
+        - name: dhparam
+          subPath: dh2048.pem
+          mountPath: /etc/postfix/dh2048.pem
+          readOnly: true
+        - name: mastercf
+          subPath: master.cf
+          mountPath: /etc/postfix/master.cf
+        - name: tz-edmonton
+          mountPath: /etc/localtime
+      initContainers:
+      - name: config-setup
+        image: busybox
+        envFrom:
+        - configMapRef:
+            name: cf-configs
+        - secretRef:
+            name: database-secret
+        #THE NEXT LINE CAN BE REMOVED IF SASL_PASSWD IS USED THROUGH DB
+        #- secretRef:
+        #    name: sasl-passwd
+        command:
+          - '/bin/sh'
+        args:
+          - '-c'
+          - "cp /scripts/* /pre-install;
+            mkdir /pre-install/postfix;
+            mkdir /pre-install/postmap;
+            SERVER_ID=\"${HOSTNAME//worker/}\";
+            SEDS='s/@ID@/'${SERVER_ID}'/g';
+            SEDS=$SEDS';s+#@alias_database@+alias_database = mysql:/etc/postfix/aliases.cf+g';
+            SEDS=$SEDS';s+#@alias_maps@+alias_maps = mysql:/etc/postfix/aliases.cf+g';
+            SEDS=$SEDS';s+#@virtual_alias_maps@+virtual_alias_maps = mysql:/etc/postfix/virtual_alias_map.cf+g';
+            SEDS=$SEDS';s+#@sender_dependent_relayhost_maps@+sender_dependent_relayhost_maps = mysql:/etc/postfix/sender_dependent_relayhost_maps.cf+g';
+            SEDS=$SEDS';s+#@smtp_generic_maps@+smtp_generic_maps = mysql:/etc/postfix/virtual_mailbox.cf+g';
+            SEDS=$SEDS';s+#@relayhost@+relayhost = [mail.sendgrid.net]:587+g';
+            SEDS=$SEDS';s+#@smtp_sasl_password_maps@+smtp_sasl_password_maps = mysql:/etc/postfix/smtp_sasl_password_maps.cf+g';
+            sed \"$SEDS\" /pre-install/main.cf.tmpl > /pre-install/postfix/main.cf;
+            rm /pre-install/main.cf.tmpl;
+            chmod 744 /pre-install/createCFs.sh;
+            /pre-install/createCFs.sh;
+            rm /pre-install/createCFs.sh"
+            #in the script the seds that are at the back of the file need to be changes
+            #Probably also the config file to ensure I can update the right config files for the aliases
+            #Added the recipient_canonical_maps for testing. That had no impact.
+            #Removed the following line again
+            #SEDS=$SEDS';s+#@virtual_mailbox_maps@+virtual_mailbox_maps = mysql    :/etc/postfix/virtual_mailbox_maps.cf+g';
+            #SEDS=$SEDS';s+#@recipient_canonical_maps@+recipient_canonical_maps = mysql:/etc/postfix/recipient_canonical_maps.cf+g';
+            #SEDS=$SEDS';s+#@smtpd_sender_login_maps@+smtpd_sender_login_maps = mysql:/etc/postfix/smtpd_sender_login_maps.cf+g';
+        volumeMounts:
+          - name: scripts
+            mountPath: /scripts/main.cf.tmpl
+            subPath: main_multi.cf.tmpl
+            readOnly: true
+          - name: pre-install
+            mountPath: /pre-install
+          - name: initscript
+            mountPath: /scripts/createCFs.sh
+            subPath: createCFs.sh
+      volumes:
+      - name: tz-edmonton
+        hostPath:
+          path: /usr/share/zoneinfo/America/Edmonton
+      - name: pre-install
+        emptyDir: {}
+      - name: scripts
+        configMap:
+          name: postfix
+      - name: cf-configs
+        configMap:
+          name: cf-configs
+      - name: initscript
+        configMap:
+          name: initscript
+      - name: database-secret
+        secret:
+          secretName: database-secret
+      - name: dhparam
+        secret:
+          secretName: dhparam
+      - name: var-mail
+        hostPath:
+          path: /var/mail
+      - name: var-mail-state
+        hostPath:
+          path: /var/mail-state
+      - name: var-spool-postfix
+        hostPath:
+          path: /var/spool/postfix
+#LAST STEP TO BE IMPLEMENTENTED BEFORE MOVING INTO PROD
+      - name: certs
+        secret:
+          secretName: tls-secret
+      - name: mastercf
+        configMap:
+          name: master
+
